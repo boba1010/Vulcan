@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Vulcan/Vulcan.csproj" />
+  <Project Path="Vulcan.SourceGen\Vulcan.SourceGen.csproj" />
+</Solution>
