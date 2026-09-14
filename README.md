@@ -82,7 +82,6 @@ Current development is focused on:
 | ----------- | ----------------- |
 | Direct3D 11 | 🟢 In development |
 | Vulkan      | 🟡 In development |
-| Direct3D 12 | ⚪ Planned         |
 
 The architecture is intended to allow additional backends without changing the public graphics abstraction.
 
