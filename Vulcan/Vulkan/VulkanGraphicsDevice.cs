@@ -1,7 +1,8 @@
 ﻿using Silk.NET.Vulkan;
 using Silk.NET.Vulkan.Extensions.KHR;
 using Silk.NET.Windowing;
-using System.Numerics;
+using Vulcan.Graphics;
+using Vulcan.Graphics.Descriptions;
 
 namespace Vulcan.Vulkan;
 
@@ -50,71 +51,57 @@ public unsafe partial class VulkanGraphicsDevice : IGraphicsDevice
         GC.SuppressFinalize(this);
     }
 
-    public void Draw()
-    {
-    }
-
-    public void DrawPoint(Vector2 position, Vector4 color)
+    public IBuffer CreateBuffer(in BufferDescription description)
     {
         throw new NotImplementedException();
     }
 
-    public void DrawLine(Vector2 start, Vector2 end, Vector4 color)
+    public ITexture CreateTexture(in TextureDescription description)
     {
         throw new NotImplementedException();
     }
 
-    public void DrawTriangle(Vector2 a, Vector2 b, Vector2 c, Vector4 color)
+    public ISampler CreateSampler(in SamplerDescription description)
     {
         throw new NotImplementedException();
     }
 
-    public void DrawRectangle(Vector2 position, Vector2 size, Vector4 color)
+    public IShader CreateShader(in ShaderDescription description)
     {
         throw new NotImplementedException();
     }
 
-    public void DrawCircle(Vector2 center, float radius, Vector4 color, int segments = 64)
+    public IPipeline CreatePipeline(in PipelineDescription description)
     {
         throw new NotImplementedException();
     }
 
-    public void DrawPoint(Vector3 position)
+    public ISwapchain CreateSwapchain(in SwapchainDescription description)
     {
         throw new NotImplementedException();
     }
 
-    public void DrawLine(Vector3 start, Vector3 end)
+    public ICommandBuffer CreateCommandBuffer()
     {
         throw new NotImplementedException();
     }
 
-    public void DrawTriangle(Vector3 a, Vector3 b, Vector3 c)
+    public ICommandQueue CreateCommandQueue()
     {
         throw new NotImplementedException();
     }
 
-    public void DrawCube(Vector3 position, Vector3 size)
+    public IFence CreateFence()
     {
         throw new NotImplementedException();
     }
 
-    public void DrawSphere(Vector3 position, float radius)
+    public ISemaphore CreateSemaphore()
     {
         throw new NotImplementedException();
     }
 
-    public void DrawPlane(Vector3 position, Vector2 size)
-    {
-        throw new NotImplementedException();
-    }
-
-    public void Clear()
-    {
-        throw new NotImplementedException();
-    }
-
-    public void Present()
+    public void WaitIdle()
     {
         throw new NotImplementedException();
     }

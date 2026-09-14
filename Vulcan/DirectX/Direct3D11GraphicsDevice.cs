@@ -3,8 +3,8 @@ using Silk.NET.Direct3D.Compilers;
 using Silk.NET.Direct3D11;
 using Silk.NET.DXGI;
 using Silk.NET.Windowing;
-using System.Numerics;
-using Vulcan.Maths;
+using Vulcan.Graphics;
+using Vulcan.Graphics.Descriptions;
 
 namespace Vulcan.DirectX;
 
@@ -20,266 +20,306 @@ public unsafe partial class Direct3D11GraphicsDevice(IWindow window) : IGraphics
     private ID3D11Texture2D* _backBuffer;
     private ID3D11RenderTargetView* _renderTargetView;
     private ID3D11Buffer* _vertexBuffer;
-    private D3DCompiler? _compiler = null;
     private ID3D11VertexShader* _vertexShader;
     private ID3D11PixelShader* _pixelShader;
     private ID3D11InputLayout* _inputLayout;
     private Viewport _viewport;
 
-    public void Clear()
-    {
-        fixed (ID3D11RenderTargetView** pRenderTarget = &_renderTargetView)
+    private const string ShaderSource = @"
+        struct VSInput
         {
-            _context->OMSetRenderTargets(1, pRenderTarget, null);
+            float3 Position : POSITION;
+            float4 Color : COLOR;
+        };
+
+        struct VSOutput
+        {
+            float4 Position : SV_POSITION;
+            float4 Color : COLOR;
+        };
+
+        VSOutput vs_main(VSInput input)
+        {
+            VSOutput output;
+            output.Position = float4(input.Position, 1);
+            output.Color = input.Color;
+            return output;
         }
 
-        var color = new float[] { 1f, 1f, 1f, 1f };
-
-        fixed (float* pColor = color)
+        float4 ps_main(VSOutput input) : SV_TARGET
         {
-            _context->ClearRenderTargetView(_renderTargetView, pColor);
+            return input.Color;
         }
-    }
-
-    public void Present()
-    {
-        _swapChain->Present(1, 0);
-    }
-
-    private ID3D10Blob* CompileShader(string source, string entryPoint, string target)
-    {
-        ID3D10Blob* blob = null;
-        ID3D10Blob* errors = null;
-
-        var sourceBytes = System.Text.Encoding.UTF8.GetBytes(source);
-
-        fixed (byte* pSource = sourceBytes)
-        {
-            _compiler?.Compile(
-                pSource,
-                (nuint)sourceBytes.Length,
-                (string)null!,
-                null,
-                null,
-                entryPoint,
-                target,
-                0,
-                0,
-                &blob,
-                &errors);
-        }
-
-        if (errors != null)
-            Console.WriteLine(SilkMarshal.PtrToString((nint)errors->GetBufferPointer()));
-
-        return blob;
-    }
+    ";
 
     public void Dispose()
     {
         _d3d?.Dispose();
     }
 
-    public void DrawVertices(Vertex[] vertices, D3DPrimitiveTopology topology)
+    public IBuffer CreateBuffer(in BufferDescription description)
     {
-        MappedSubresource mapped = default;
+        if (description.Size > uint.MaxValue)
+            throw new ArgumentOutOfRangeException(nameof(description), "D3D11 buffers cannot exceed 4 GB.");
 
-        _context->Map(
-            (ID3D11Resource*)_vertexBuffer,
-            0,
-            Map.WriteDiscard,
-            0,
-            &mapped);
-
-        fixed (Vertex* data = vertices)
+        var desc = new BufferDesc
         {
-            System.Buffer.MemoryCopy(
-                data,
-                mapped.PData,
-                sizeof(Vertex) * vertices.Length,
-                sizeof(Vertex) * vertices.Length);
-        }
-
-        _context->Unmap((ID3D11Resource*)_vertexBuffer, 0);
-
-        _context->IASetInputLayout(_inputLayout);
-
-        _context->IASetPrimitiveTopology(topology);
-
-        _context->VSSetShader(_vertexShader, null, 0);
-        _context->PSSetShader(_pixelShader, null, 0);
-
-        uint stride = (uint)sizeof(Vertex);
-        uint offset = 0;
-
-        fixed (ID3D11Buffer** vertexBuffer = &_vertexBuffer)
-        {
-            _context->IASetVertexBuffers(
-                0,
-                1,
-                vertexBuffer,
-                &stride,
-                &offset);
-        }
-
-        _context->Draw((uint)vertices.Length, 0);
-    }
-
-    public void DrawPoint(Vector2 position, Vector4 color)
-    {
-        var vertex = new Vertex
-        {
-            Position = position,
-            Color = color
-        };
-
-        MappedSubresource mapped = default;
-
-        _context->IASetInputLayout(_inputLayout);
-
-        _context->Map(
-            (ID3D11Resource*)_vertexBuffer,
-            0,
-            Map.WriteDiscard,
-            0,
-            &mapped);
-
-        *(Vertex*)mapped.PData = vertex;
-
-        _context->Unmap((ID3D11Resource*)_vertexBuffer, 0);
-
-        _context->IASetPrimitiveTopology(
-            D3DPrimitiveTopology.D3D10PrimitiveTopologyPointlist);
-
-        _context->VSSetShader(_vertexShader, null, 0);
-        _context->PSSetShader(_pixelShader, null, 0);
-
-        uint stride = (uint)sizeof(Vertex);
-        uint offset = 0;
-
-        fixed (ID3D11Buffer** vertexBuffer = &_vertexBuffer)
-        {
-            _context->IASetVertexBuffers(
-                0,
-                1,
-                vertexBuffer,
-                &stride,
-                &offset);
-        }
-
-        _context->Draw(1, 0);
-    }
-
-    public void DrawLine(Vector2 start, Vector2 end, Vector4 color)
-    {
-        var vertices = new Vertex[]
-        {
-            new() { Position = start, Color = color },
-            new() { Position = end, Color = color }
-        };
-
-        DrawVertices(vertices, D3DPrimitiveTopology.D3D10PrimitiveTopologyLinelist);
-    }
-
-    public void DrawTriangle(Vector2 a, Vector2 b, Vector2 c, Vector4 color)
-    {
-        var vertices = new Vertex[]
-        {
-            new() { Position = a, Color = color },
-            new() { Position = c, Color = color },
-            new() { Position = b, Color = color },
-        };
-
-        DrawVertices(vertices, D3DPrimitiveTopology.D3D10PrimitiveTopologyTrianglelist);
-    }
-
-    public void DrawRectangle(Vector2 position, Vector2 size, Vector4 color)
-    {
-        float x = position.X;
-        float y = position.Y;
-        float width = size.X;
-        float height = size.Y;
-
-        var vertices = new Vertex[]
-        {
-            // Triangle 1
-            new() { Position = new(x, y), Color = color },
-            new() { Position = new(x, y + height), Color = color },
-            new() { Position = new(x + width, y), Color = color },
-
-            // Triangle 2
-            new() { Position = new(x, y + height), Color = color },
-            new() { Position = new(x + width, y + height), Color = color },
-            new() { Position = new(x + width, y), Color = color }
-        };
-
-        DrawVertices(vertices, D3DPrimitiveTopology.D3D10PrimitiveTopologyTrianglelist);
-    }
-
-    public void DrawCircle(Vector2 center, float radius, Vector4 color, int segments = 64)
-    {
-        var vertices = new Vertex[segments * 3];
-
-        float step = MathF.Tau / segments;
-
-        for (int i = 0; i < segments; i++)
-        {
-            float angle1 = i * step;
-            float angle2 = (i + 1) * step;
-            float aspect = (float)_window.Size.X / _window.Size.Y;
-
-            vertices[i * 3] = new Vertex
+            ByteWidth = (uint)description.Size,
+            Usage = description.MemoryUsage switch
             {
-                Position = center,
-                Color = color
-            };
-
-            vertices[i * 3 + 1] = new Vertex
+                MemoryUsage.DeviceLocal => Silk.NET.Direct3D11.Usage.Default,
+                MemoryUsage.Upload => Silk.NET.Direct3D11.Usage.Dynamic,
+                MemoryUsage.Readback => Silk.NET.Direct3D11.Usage.Staging,
+                _ => throw new ArgumentOutOfRangeException()
+            },
+            BindFlags = description.Usage switch
             {
-                Position = center + new Vector2(
-                    MathF.Cos(angle2) * radius / aspect,
-                    MathF.Sin(angle2) * radius),
-                Color = color
-            };
-
-            vertices[i * 3 + 2] = new Vertex
+                BufferUsage.Vertex => (uint)BindFlag.VertexBuffer,
+                BufferUsage.Index => (uint)BindFlag.IndexBuffer,
+                BufferUsage.Uniform => (uint)BindFlag.ConstantBuffer,
+                BufferUsage.Storage => (uint)BindFlag.UnorderedAccess,
+                BufferUsage.Indirect => 0,
+                BufferUsage.CopySource => 0,
+                BufferUsage.CopyDestination => 0,
+                _ => throw new ArgumentOutOfRangeException()
+            },
+            CPUAccessFlags = description.MemoryUsage switch
             {
-                Position = center + new Vector2(
-                    MathF.Cos(angle1) * radius / aspect,
-                    MathF.Sin(angle1) * radius),
-                Color = color
-            };
-        }
+                MemoryUsage.Upload => (uint)CpuAccessFlag.Write,
+                MemoryUsage.Readback => (uint)CpuAccessFlag.Read,
+                _ => 0
+            },
+            MiscFlags = description.Usage == BufferUsage.Indirect
+            ? (uint)ResourceMiscFlag.DrawindirectArgs
+            : 0
+        };
 
-        DrawVertices(vertices, D3DPrimitiveTopology.D3D10PrimitiveTopologyTrianglelist);
+        ID3D11Buffer* buffer = null;
+
+        var result = _device->CreateBuffer(
+            &desc,
+            null,
+            &buffer);
+
+        if (result < 0)
+            throw new InvalidOperationException($"Failed to create D3D11 buffer. HRESULT: 0x{result:X8}");
+
+        return new D3D11Buffer(buffer);
     }
 
-    public void DrawPoint(Vector3 position)
+    private static Silk.NET.DXGI.Format GetFormat(TextureFormat format)
+    {
+        return format switch
+        {
+            TextureFormat.R8Unorm => Silk.NET.DXGI.Format.FormatR8Unorm,
+            TextureFormat.R8G8Unorm => Silk.NET.DXGI.Format.FormatR8G8Unorm,
+            TextureFormat.R8G8B8A8Unorm => Silk.NET.DXGI.Format.FormatR8G8B8A8Unorm,
+            TextureFormat.R8G8B8A8Srgb => Silk.NET.DXGI.Format.FormatR8G8B8A8UnormSrgb,
+
+            TextureFormat.R16Float => Silk.NET.DXGI.Format.FormatR16Float,
+            TextureFormat.R16G16Float => Silk.NET.DXGI.Format.FormatR16G16Float,
+            TextureFormat.R16G16B16A16Float => Silk.NET.DXGI.Format.FormatR16G16B16A16Float,
+
+            TextureFormat.R32Float => Silk.NET.DXGI.Format.FormatR32Float,
+            TextureFormat.R32G32Float => Silk.NET.DXGI.Format.FormatR32G32Float,
+            TextureFormat.R32G32B32Float => Silk.NET.DXGI.Format.FormatR32G32B32Float,
+            TextureFormat.R32G32B32A32Float => Silk.NET.DXGI.Format.FormatR32G32B32A32Float,
+
+            TextureFormat.D16Unorm => Silk.NET.DXGI.Format.FormatD16Unorm,
+            TextureFormat.D24UnormS8Uint => Silk.NET.DXGI.Format.FormatD24UnormS8Uint,
+            TextureFormat.D32Float => Silk.NET.DXGI.Format.FormatD32Float,
+            TextureFormat.D32FloatS8Uint => Silk.NET.DXGI.Format.FormatD32FloatS8X24Uint,
+
+            TextureFormat.Unknown => throw new ArgumentException(
+                "Texture format cannot be Unknown.", nameof(format)),
+
+            _ => throw new ArgumentOutOfRangeException(nameof(format))
+        };
+    }
+
+    private static uint GetBindFlags(TextureUsage usage)
+    {
+        return usage switch
+        {
+            TextureUsage.Sampled => (uint)BindFlag.ShaderResource,
+            TextureUsage.Storage => (uint)BindFlag.UnorderedAccess,
+            TextureUsage.RenderTarget => (uint)BindFlag.RenderTarget,
+            TextureUsage.DepthStencil => (uint)BindFlag.DepthStencil,
+            TextureUsage.CopySource => 0,
+            TextureUsage.CopyDestination => 0,
+            _ => throw new ArgumentOutOfRangeException(nameof(usage))
+        };
+    }
+
+    private ITexture CreateTexture1D(in TextureDescription description)
+    {
+        if (description.Type != TextureType.Texture1D)
+            throw new InvalidDataException($"Texture type {description.Type} is invalid in this context.");
+
+        var desc = new Texture1DDesc
+        {
+            Width = description.Width,
+            MipLevels = description.MipLevels,
+            ArraySize = description.ArrayLayers,
+            Format = GetFormat(description.Format),
+            Usage = Usage.Default,
+            BindFlags = GetBindFlags(description.Usage)
+        };
+
+        ID3D11Texture1D* texture = null;
+
+        var result = _device->CreateTexture1D(&desc, null, &texture);
+
+        if (result < 0)
+            throw new InvalidOperationException(
+                $"Failed to create D3D11 texture. HRESULT: 0x{result:X8}");
+
+        return new D3D11Texture((ID3D11Resource*)texture);
+    }
+
+    private ITexture CreateTexture2D(in TextureDescription description)
+    {
+        if (description.Type != TextureType.Texture2D)
+            throw new InvalidDataException($"Texture type {description.Type} is invalid in this context.");
+
+        var desc = new Texture2DDesc
+        {
+            Width = description.Width,
+            Height = description.Height,
+            MipLevels = description.MipLevels,
+            ArraySize = description.ArrayLayers,
+            Format = GetFormat(description.Format),
+            SampleDesc = new SampleDesc
+            {
+                Count = (uint)description.Samples,
+                Quality = 0
+            },
+            Usage = Usage.Default,
+            BindFlags = GetBindFlags(description.Usage)
+        };
+
+        ID3D11Texture2D* texture = null;
+
+        var result = _device->CreateTexture2D(&desc, null, &texture);
+
+        if (result < 0)
+            throw new InvalidOperationException($"Failed to create D3D11 texture. HRESULT: 0x{result:X8}");
+
+        return new D3D11Texture((ID3D11Resource*)texture);
+    }
+
+    private ITexture CreateTexture3D(in TextureDescription description)
+    {
+        if (description.Type != TextureType.Texture2D)
+            throw new InvalidDataException($"Texture type {description.Type} is invalid in this context.");
+
+        var desc = new Texture3DDesc
+        {
+            Width = description.Width,
+            Height = description.Height,
+            Depth = description.Depth,
+            MipLevels = description.MipLevels,
+            Format = GetFormat(description.Format),
+            Usage = Usage.Default,
+            BindFlags = GetBindFlags(description.Usage)
+        };
+
+        ID3D11Texture3D* texture = null;
+
+        var result = _device->CreateTexture3D(&desc, null, &texture);
+
+        if (result < 0)
+            throw new InvalidOperationException($"Failed to create D3D11 texture. HRESULT: 0x{result:X8}");
+
+        return new D3D11Texture((ID3D11Resource*)texture);
+    }
+
+    private ITexture CreateTextureCube(in TextureDescription description)
+    {
+        if (description.Type != TextureType.Cube)
+            throw new InvalidDataException($"Texture type {description.Type} is invalid in this context.");
+
+        var desc = new Texture2DDesc
+        {
+            Width = description.Width,
+            Height = description.Height,
+            MipLevels = description.MipLevels,
+            ArraySize = 6,
+            Format = GetFormat(description.Format),
+            SampleDesc = new SampleDesc
+            {
+                Count = 1,
+                Quality = 0
+            },
+            Usage = Usage.Default,
+            BindFlags = GetBindFlags(description.Usage),
+            MiscFlags = (uint)ResourceMiscFlag.Texturecube
+        };
+
+        ID3D11Texture2D* texture = null;
+
+        var result = _device->CreateTexture2D(&desc, null, &texture);
+
+        if (result < 0)
+            throw new InvalidOperationException(
+                $"Failed to create D3D11 cube texture. HRESULT: 0x{result:X8}");
+
+        return new D3D11Texture((ID3D11Resource*)texture);
+    }
+    
+    public ITexture CreateTexture(in TextureDescription description)
+    {
+        return description.Type switch
+        {
+            TextureType.Texture1D => CreateTexture1D(description),
+            TextureType.Texture2D => CreateTexture2D(description),
+            TextureType.Texture3D => CreateTexture3D(description),
+            TextureType.Cube => CreateTextureCube(description),
+            _ => throw new ArgumentOutOfRangeException(nameof(description))
+        };
+    }
+
+    public ISampler CreateSampler(in SamplerDescription description)
     {
         throw new NotImplementedException();
     }
 
-    public void DrawLine(Vector3 start, Vector3 end)
+    public IShader CreateShader(in ShaderDescription description)
     {
         throw new NotImplementedException();
     }
 
-    public void DrawTriangle(Vector3 a, Vector3 b, Vector3 c)
+    public IPipeline CreatePipeline(in PipelineDescription description)
     {
         throw new NotImplementedException();
     }
 
-    public void DrawCube(Vector3 position, Vector3 size)
+    public ISwapchain CreateSwapchain(in SwapchainDescription description)
     {
         throw new NotImplementedException();
     }
 
-    public void DrawSphere(Vector3 position, float radius)
+    public ICommandBuffer CreateCommandBuffer()
     {
         throw new NotImplementedException();
     }
 
-    public void DrawPlane(Vector3 position, Vector2 size)
+    public ICommandQueue CreateCommandQueue()
+    {
+        throw new NotImplementedException();
+    }
+
+    public IFence CreateFence()
+    {
+        throw new NotImplementedException();
+    }
+
+    public ISemaphore CreateSemaphore()
+    {
+        throw new NotImplementedException();
+    }
+
+    public void WaitIdle()
     {
         throw new NotImplementedException();
     }

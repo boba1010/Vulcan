@@ -1,8 +1,25 @@
-﻿namespace Vulcan;
+﻿using Vulcan.Graphics;
+using Vulcan.Graphics.Descriptions;
 
-public interface IGraphicsDevice : IDisposable, IGraphics2D, IGraphics3D
+namespace Vulcan;
+
+public interface IGraphicsDevice : IDisposable
 {
-    public void Initialize();
-    public void Clear();
-    public void Present();
+    void Initialize();
+
+    IBuffer CreateBuffer(in BufferDescription description);
+    ITexture CreateTexture(in TextureDescription description);
+    ISampler CreateSampler(in SamplerDescription description);
+    IShader CreateShader(in ShaderDescription description);
+    IPipeline CreatePipeline(in PipelineDescription description);
+
+    ISwapchain CreateSwapchain(in SwapchainDescription description);
+
+    ICommandBuffer CreateCommandBuffer();
+    ICommandQueue CreateCommandQueue();
+
+    IFence CreateFence();
+    ISemaphore CreateSemaphore();
+
+    void WaitIdle();
 }

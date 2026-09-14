@@ -29,7 +29,6 @@ public sealed class VulcanGraphicsDeviceGenerator : IIncrementalGenerator
                 {
                     public GraphicsBackend Backend { get; set; }
                     public bool Debug { get; set; }
-                    public bool BgraSupport { get; set; } = true;
                 }
                 """);
         });
@@ -71,22 +70,18 @@ public sealed class VulcanGraphicsDeviceGenerator : IIncrementalGenerator
             .FirstOrDefault(x => x.Key == "Debug")
             .Value.Value is true;
 
-        var bgraSupport = attribute.NamedArguments
-            .FirstOrDefault(x => x.Key == "BgraSupport")
-            .Value.Value is not false;
-
         var backend = attribute.NamedArguments
             .FirstOrDefault(x => x.Key == "Backend")
             .Value.Value is GraphicsBackend value
                 ? value
                 : GraphicsBackend.D3D11;
 
-        var source = backend == GraphicsBackend.D3D11 ? GenerateD3D11(type, debug, bgraSupport) : GenerateVulkan(type, debug);
+        var source = backend == GraphicsBackend.D3D11 ? GenerateD3D11(type, debug) : GenerateVulkan(type, debug);
 
         context.AddSource($"{type.Name}.g.cs", source);
     }
 
-    private static string GenerateD3D11(INamedTypeSymbol type, bool debug, bool bgra)
+    private static string GenerateD3D11(INamedTypeSymbol type, bool debug)
     {
         var source = $$""""
         using Silk.NET.Direct3D11;
@@ -110,9 +105,6 @@ public sealed class VulcanGraphicsDeviceGenerator : IIncrementalGenerator
                 InitializeBackBuffer();
                 InitializeRenderTarget();
                 InitializeViewport();
-                InitializePointBuffer();
-                InitializeShaderCompiler();
-                InitializeShaders();
 
                 if ({{debug.ToString().ToLower()}})
                     Console.WriteLine("Initialized D3D11 successfully");
@@ -207,129 +199,6 @@ public sealed class VulcanGraphicsDeviceGenerator : IIncrementalGenerator
 
                 if ({{debug.ToString().ToLower()}})
                     Console.WriteLine("Initialized D3D render target successfully");
-            }
-
-            private void InitializePointBuffer()
-            {
-                var desc = new BufferDesc
-                {
-                    Usage = Usage.Dynamic,
-                    ByteWidth = (uint)(sizeof(Vertex) * 300),
-                    BindFlags = (uint)BindFlag.VertexBuffer,
-                    CPUAccessFlags = (uint)CpuAccessFlag.Write
-                };
-
-                fixed (ID3D11Buffer** buffer = &_vertexBuffer)
-                {
-                    _device->CreateBuffer(
-                        &desc,
-                        null,
-                        buffer);
-                }
-            }
-
-            private void InitializeShaderCompiler()
-            {
-                _compiler = D3DCompiler.GetApi();
-            }
-
-            private unsafe void InitializeShaders()
-            {
-                string shaderSource = @"
-                struct VSInput
-                {
-                    float2 Position : POSITION;
-                    float4 Color : COLOR;
-                };
-
-                struct VSOutput
-                {
-                    float4 Position : SV_POSITION;
-                    float4 Color : COLOR;
-                };
-
-                VSOutput vs_main(VSInput input)
-                {
-                    VSOutput output;
-                    output.Position = float4(input.Position, 0, 1);
-                    output.Color = input.Color;
-                    return output;
-                }
-
-                float4 ps_main(VSOutput input) : SV_TARGET
-                {
-                    return input.Color;
-                }
-                ";
-
-                var vertexShaderBlob = CompileShader(shaderSource, "vs_main", "vs_5_0");
-
-                fixed (ID3D11VertexShader** vertexShader = &_vertexShader)
-                {
-                    var result = _device->CreateVertexShader(
-                        vertexShaderBlob->GetBufferPointer(),
-                        vertexShaderBlob->GetBufferSize(),
-                        null,
-                        vertexShader);
-
-                    Console.WriteLine($"VertexShader: 0x{result:X8}");
-                }
-
-                var pixelShaderBlob = CompileShader(shaderSource, "ps_main", "ps_5_0");
-
-                fixed (ID3D11PixelShader** pixelShader = &_pixelShader)
-                {
-                    var result = _device->CreatePixelShader(
-                        pixelShaderBlob->GetBufferPointer(),
-                        pixelShaderBlob->GetBufferSize(),
-                        null,
-                        pixelShader);
-
-                    Console.WriteLine($"PixelShader: 0x{result:X8}");
-                }
-
-                var positionSemantic = SilkMarshal.StringToPtr("POSITION");
-                var colorSemantic = SilkMarshal.StringToPtr("COLOR");
-
-                var inputElements = new InputElementDesc[2];
-
-                inputElements[0] = new InputElementDesc
-                {
-                    SemanticName = (byte*)positionSemantic,
-                    SemanticIndex = 0,
-                    Format = Format.FormatR32G32Float,
-                    InputSlot = 0,
-                    AlignedByteOffset = 0,
-                    InputSlotClass = InputClassification.PerVertexData,
-                    InstanceDataStepRate = 0
-                };
-
-                inputElements[1] = new InputElementDesc
-                {
-                    SemanticName = (byte*)colorSemantic,
-                    SemanticIndex = 0,
-                    Format = Format.FormatR32G32B32A32Float, // 4 floats
-                    InputSlot = 0,
-                    AlignedByteOffset = 8, // Correct 8-byte padding offset
-                    InputSlotClass = InputClassification.PerVertexData,
-                    InstanceDataStepRate = 0
-                };
-
-                fixed (InputElementDesc* elements = inputElements)
-                fixed (ID3D11InputLayout** pInputLayout = &_inputLayout)
-                {
-                    var result = _device->CreateInputLayout(
-                        elements,
-                        2,
-                        vertexShaderBlob->GetBufferPointer(),
-                        vertexShaderBlob->GetBufferSize(),
-                        pInputLayout);
-
-                    Console.WriteLine($"InputLayout: 0x{result:X8}");
-                }
-
-                SilkMarshal.Free(positionSemantic);
-                SilkMarshal.Free(colorSemantic);
             }
 
             private void InitializeViewport()
