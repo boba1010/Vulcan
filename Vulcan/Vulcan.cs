@@ -18,4 +18,9 @@ public static class Vulcan
 
         throw new NotSupportedException($"{RuntimeInformation.OSDescription} is not a supported OS");
     }
+
+    public static I2DGraphicsDevice Create2DDevice(IWindow window)
+    {
+        throw new NotSupportedException($"{RuntimeInformation.OSDescription} is not a supported OS");
+    }
 }

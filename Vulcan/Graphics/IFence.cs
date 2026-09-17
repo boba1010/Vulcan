@@ -2,8 +2,7 @@
 
 public interface IFence : IDisposable
 {
-    bool IsSignaled { get; }
+    ulong Value { get; }
 
     void Wait();
-    void Reset();
 }

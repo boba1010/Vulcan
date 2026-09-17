@@ -11,11 +11,14 @@ public interface IGraphicsDevice : IDisposable
     ITexture CreateTexture(in TextureDescription description);
     ISampler CreateSampler(in SamplerDescription description);
     IShader CreateShader(in ShaderDescription description);
+    IVertexLayout CreateVertexLayout(in VertexLayoutDescription description);
+    IRasterizerState CreateRasterizerState(in RasterizerDescription description);
+    IDepthStencilState CreateDepthStencilState(in DepthStencilDescription description);
+    IBlendState CreateBlendState(in BlendDescription description);
     IPipeline CreatePipeline(in PipelineDescription description);
 
     ISwapchain CreateSwapchain(in SwapchainDescription description);
 
-    ICommandBuffer CreateCommandBuffer();
     ICommandQueue CreateCommandQueue();
 
     IFence CreateFence();

@@ -1,6 +1,6 @@
 ﻿namespace Vulcan.Graphics;
 
-public interface IViewport
+public readonly struct Viewport : IViewport
 {
     public float X { get; init; }
     public float Y { get; init; }

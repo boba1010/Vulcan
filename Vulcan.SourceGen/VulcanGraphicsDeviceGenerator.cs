@@ -95,16 +95,14 @@ public sealed class VulcanGraphicsDeviceGenerator : IIncrementalGenerator
 
         unsafe partial class {{type.Name}} : IGraphicsDevice
         {
-            private const uint RenderTargetOutput = 0x20;
-
             public void Initialize()
             {
                 InitializeD3D();
                 InitializeDevice();
-                InitializeSwapChain();
-                InitializeBackBuffer();
-                InitializeRenderTarget();
-                InitializeViewport();
+                InitializeDevice5();
+                InitializeFactory();
+                InitializeContext4();
+                InitializeWaitIdle();
 
                 if ({{debug.ToString().ToLower()}})
                     Console.WriteLine("Initialized D3D11 successfully");
@@ -139,84 +137,50 @@ public sealed class VulcanGraphicsDeviceGenerator : IIncrementalGenerator
                     Console.WriteLine("Initialized D3D device successfully");
             }
 
-            private void InitializeSwapChain()
+            private void InitializeDevice5()
             {
-                _factory = DXGI.GetApi(_window).CreateDXGIFactory2<IDXGIFactory2>(0);
-
-                var desc = new SwapChainDesc1
+                fixed (ID3D11Device5** device5 = &_device5)
                 {
-                    Width = (uint)_window.Size.X,
-                    Height = (uint)_window.Size.Y,
-                    Format = Format.FormatB8G8R8A8Unorm,
-                    BufferCount = 2,
-                    BufferUsage = RenderTargetOutput,
-                    SampleDesc = new SampleDesc
-                    {
-                        Count = 1,
-                        Quality = 0
-                    },
-                    SwapEffect = SwapEffect.FlipDiscard
+                    _device->QueryInterface(
+                        SilkMarshal.GuidPtrOf<ID3D11Device5>(),
+                        (void**)device5);
+                }
+            }
+
+            private void InitializeContext4()
+            {
+                fixed (ID3D11DeviceContext4** context4 = &_context4)
+                {
+                    _context->QueryInterface(
+                        SilkMarshal.GuidPtrOf<ID3D11DeviceContext4>(),
+                        (void**)context4);
+                }
+            }
+
+            private void InitializeWaitIdle()
+            {
+                var description = new QueryDesc
+                {
+                    Query = Query.Event
                 };
 
-                fixed (IDXGISwapChain1** swapChain = &_swapChain)
-                {
-                    _factory.CreateSwapChainForHwnd(
-                        (IUnknown*)_device,
-                        _window.Native!.DXHandle!.Value,
-                        &desc,
-                        (SwapChainFullscreenDesc*)null,
-                        (IDXGIOutput*)null,
-                        swapChain);
-                }
+                ID3D11Query* query = null;
 
-                if ({{debug.ToString().ToLower()}})
-                    Console.WriteLine("Initialized D3D Swapchain successfully");
+                var result = _device->CreateQuery(
+                    &description,
+                    &query);
+
+                if (result < 0)
+                    throw new InvalidOperationException(
+                        $"Failed to create D3D11 wait-idle query. HRESULT: 0x{result:X8}");
+
+                _waitIdleQuery = query;
             }
 
-            private void InitializeBackBuffer()
+            private void InitializeFactory()
             {
-                fixed (ID3D11Texture2D** backBuffer = &_backBuffer)
-                {
-                    _swapChain->GetBuffer(
-                        0,
-                        SilkMarshal.GuidPtrOf<ID3D11Texture2D>(),
-                        (void**)backBuffer);
-                }
-
-                if ({{debug.ToString().ToLower()}})
-                    Console.WriteLine("Initialized D3D backbuffer successfully");
-            }
-
-            private void InitializeRenderTarget()
-            {
-                fixed (ID3D11RenderTargetView** renderTargetView = &_renderTargetView)
-                {
-                    _device->CreateRenderTargetView(
-                        (ID3D11Resource*)_backBuffer,
-                        null,
-                        renderTargetView);
-                }
-
-                if ({{debug.ToString().ToLower()}})
-                    Console.WriteLine("Initialized D3D render target successfully");
-            }
-
-            private void InitializeViewport()
-            {
-                _viewport = new Viewport
-                {
-                    TopLeftX = 0,
-                    TopLeftY = 0,
-                    Width = _window.Size.X,
-                    Height = _window.Size.Y,
-                    MinDepth = 0,
-                    MaxDepth = 1
-                };
-
-                fixed (Viewport* viewport = &_viewport)
-                {
-                    _context->RSSetViewports(1, viewport);
-                }
+                _factory = DXGI.GetApi(_window)
+                    .CreateDXGIFactory2<IDXGIFactory2>(0);
             }
         }
         """";

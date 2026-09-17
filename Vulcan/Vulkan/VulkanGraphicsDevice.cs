@@ -105,4 +105,24 @@ public unsafe partial class VulkanGraphicsDevice : IGraphicsDevice
     {
         throw new NotImplementedException();
     }
+
+    public IVertexLayout CreateVertexLayout(in VertexLayoutDescription description)
+    {
+        throw new NotImplementedException();
+    }
+
+    public IRasterizerState CreateRasterizerState(in RasterizerDescription description)
+    {
+        throw new NotImplementedException();
+    }
+
+    public IDepthStencilState CreateDepthStencilState(in DepthStencilDescription description)
+    {
+        throw new NotImplementedException();
+    }
+
+    public IBlendState CreateBlendState(in BlendDescription description)
+    {
+        throw new NotImplementedException();
+    }
 }

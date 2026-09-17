@@ -2,4 +2,5 @@
 
 public interface IBuffer : IDisposable
 {
+    void Upload(ReadOnlySpan<byte> data);
 }
