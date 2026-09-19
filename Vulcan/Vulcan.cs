@@ -21,6 +21,9 @@ public static class Vulcan
 
     public static I2DGraphicsDevice Create2DDevice(IWindow window)
     {
+        if (OperatingSystem.IsWindows())
+            return new Direct2DGraphicsDevice(window);
+
         throw new NotSupportedException($"{RuntimeInformation.OSDescription} is not a supported OS");
     }
 }

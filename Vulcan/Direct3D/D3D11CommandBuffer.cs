@@ -92,7 +92,7 @@ public unsafe sealed class D3D11CommandBuffer : ICommandBuffer
 
     public void ClearColor(float r, float g, float b, float a)
     {
-        float[] color = new[] { r, g, b, a };
+        float[] color = [r, g, b, a];
 
         fixed (float* colorPtr = color)
         {

@@ -77,7 +77,7 @@ public unsafe sealed class D3D11Swapchain : ISwapchain
 
     public void Present()
     {
-        _swapChain->Present(1, 0);
+        _swapChain->Present(0, 0);
     }
 
     public void Dispose()

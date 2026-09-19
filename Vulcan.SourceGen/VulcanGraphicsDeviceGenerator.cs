@@ -1,6 +1,7 @@
-﻿using System.Collections.Immutable;
-using Microsoft.CodeAnalysis;
+﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using System.Collections.Immutable;
+using System.Diagnostics;
 
 namespace Vulcan.SourceGen;
 
@@ -21,6 +22,7 @@ public sealed class VulcanGraphicsDeviceGenerator : IIncrementalGenerator
                 public enum GraphicsBackend
                 {
                     D3D11,
+                    D2D1,
                     Vulkan
                 }
 
@@ -34,10 +36,7 @@ public sealed class VulcanGraphicsDeviceGenerator : IIncrementalGenerator
         });
 
         var types = context.SyntaxProvider
-            .CreateSyntaxProvider(
-                static (node, _) =>
-                    node is ClassDeclarationSyntax,
-
+            .CreateSyntaxProvider(static (node, _) => node is ClassDeclarationSyntax,
                 static (ctx, _) =>
                 {
                     var declaration = (ClassDeclarationSyntax)ctx.Node;
@@ -70,13 +69,22 @@ public sealed class VulcanGraphicsDeviceGenerator : IIncrementalGenerator
             .FirstOrDefault(x => x.Key == "Debug")
             .Value.Value is true;
 
-        var backend = attribute.NamedArguments
-            .FirstOrDefault(x => x.Key == "Backend")
-            .Value.Value is GraphicsBackend value
-                ? value
-                : GraphicsBackend.D3D11;
+        var backend = attribute.NamedArguments.FirstOrDefault(x => x.Key == "Backend").Value.Value is int value ? value : 0;
 
-        var source = backend == GraphicsBackend.D3D11 ? GenerateD3D11(type, debug) : GenerateVulkan(type, debug);
+        string source = "";
+
+        switch (backend)
+        {
+            case 0:
+                source = GenerateD3D11(type, debug);
+                break;
+            case 1:
+                source = GenerateD2D1(type, debug);
+                break;
+            case 2:
+                source = GenerateVulkan(type, debug);
+                break;
+        }
 
         context.AddSource($"{type.Name}.g.cs", source);
     }
@@ -88,7 +96,6 @@ public sealed class VulcanGraphicsDeviceGenerator : IIncrementalGenerator
         using Silk.NET.Core.Native;
         using Silk.NET.DXGI;
         using Silk.NET.Direct3D.Compilers;
-        using Vulcan.Maths;
         using System.Numerics;
 
         namespace {{type.ContainingNamespace.ToDisplayString()}};
@@ -191,5 +198,88 @@ public sealed class VulcanGraphicsDeviceGenerator : IIncrementalGenerator
     private static string GenerateVulkan(INamedTypeSymbol type, bool debug)
     {
         return "";
+    }
+
+    private static string GenerateD2D1(INamedTypeSymbol type, bool debug)
+    {
+        var source = $$""""
+        using Silk.NET.Direct2D;
+        using System.Numerics;
+        using Silk.NET.DirectWrite;
+
+        namespace {{type.ContainingNamespace.ToDisplayString()}};
+
+        unsafe partial class {{type.Name}} : I2DGraphicsDevice
+        {
+            public void Initialize()
+            {
+                _d2d = D2D.GetApi();
+                CreateFactory();
+                CreateRenderTarget();
+                CreateDWrite();
+            }
+
+            private void CreateDWrite()
+            {
+                _dwrite = DWrite.GetApi();
+                _writeFactory = _dwrite.DWriteCreateFactory<Silk.NET.DirectWrite.IDWriteFactory>(
+                    Silk.NET.DirectWrite.FactoryType.Shared
+                ).Handle;
+            }
+
+            private void CreateFactory()
+            {
+                Guid riid = typeof(ID2D1Factory).GUID;
+                void* factory = null;
+
+                int result = _d2d.D2D1CreateFactory(Silk.NET.Direct2D.FactoryType.SingleThreaded, ref riid, null, ref factory);
+
+                if (result < 0)
+                    throw new InvalidOperationException($"D2D1CreateFactory failed: 0x{result:X8}");
+
+                _factory = (ID2D1Factory*)factory;
+            }
+
+            private void CreateRenderTarget()
+            {
+                var renderTargetProperties = new RenderTargetProperties
+                {
+                    Type = RenderTargetType.Default,
+                    PixelFormat = new PixelFormat
+                    {
+                        Format = Silk.NET.DXGI.Format.FormatUnknown,
+                        AlphaMode = AlphaMode.Unknown
+                    },
+                    DpiX = 0,
+                    DpiY = 0,
+                    Usage = RenderTargetUsage.None,
+                    MinLevel = FeatureLevel.LevelDefault
+                };
+
+                var hwndProperties = new HwndRenderTargetProperties
+                {
+                    Hwnd = _window.Native!.Win32!.Value.Hwnd,
+                    PixelSize = new Silk.NET.Maths.Vector2D<uint>((uint)_window.Size.X, (uint)_window.Size.Y),
+                    PresentOptions = PresentOptions.None
+                };
+
+                ID2D1HwndRenderTarget* renderTarget = null;
+
+                var result = _factory->CreateHwndRenderTarget(&renderTargetProperties, &hwndProperties, &renderTarget);
+
+                if (result < 0)
+                    throw new InvalidOperationException($"Failed to create D2D render target. HRESULT: 0x{result:X8}");
+
+                _renderTarget = renderTarget;
+
+                if (_renderTarget is null)
+                    throw new InvalidOperationException("D2D render target is null.");
+
+                Console.WriteLine("D2D render target created!");
+            }
+        }
+        """";
+
+        return source;
     }
 }
