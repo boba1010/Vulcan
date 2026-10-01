@@ -137,10 +137,22 @@ public unsafe partial class Direct3D11GraphicsDevice(IWindow window) : IGraphics
         var result = _device->CreateTexture1D(&desc, null, &texture);
 
         if (result < 0)
-            throw new InvalidOperationException(
-                $"Failed to create D3D11 texture. HRESULT: 0x{result:X8}");
+            throw new InvalidOperationException($"Failed to create D3D11 texture. HRESULT: 0x{result:X8}");
 
-        return new D3D11Texture((ID3D11Resource*)texture);
+        ID3D11ShaderResourceView* shaderResourceView = null;
+
+        if (description.Usage == TextureUsage.Sampled)
+        {
+            result = _device->CreateShaderResourceView((ID3D11Resource*)texture, null, &shaderResourceView);
+
+            if (result < 0)
+            {
+                texture->Release();
+                throw new InvalidOperationException($"Failed to create shader resource view. HRESULT: 0x{result:X8}");
+            }
+        }
+
+        return new D3D11Texture((ID3D11Resource*)texture, _context, shaderResourceView);
     }
 
     private ITexture CreateTexture2D(in TextureDescription description)
@@ -184,12 +196,25 @@ public unsafe partial class Direct3D11GraphicsDevice(IWindow window) : IGraphics
             }
         }
 
-        return new D3D11Texture((ID3D11Resource*)texture, depthStencilView);
+        ID3D11ShaderResourceView* shaderResourceView = null;
+
+        if (description.Usage == TextureUsage.Sampled)
+        {
+            result = _device->CreateShaderResourceView((ID3D11Resource*)texture, null, &shaderResourceView);
+
+            if (result < 0)
+            {
+                texture->Release();
+                throw new InvalidOperationException($"Failed to create shader resource view. HRESULT: 0x{result:X8}");
+            }
+        }
+
+        return new D3D11Texture((ID3D11Resource*)texture, _context, shaderResourceView, depthStencilView);
     }
 
     private ITexture CreateTexture3D(in TextureDescription description)
     {
-        if (description.Type != TextureType.Texture2D)
+        if (description.Type != TextureType.Texture3D)
             throw new InvalidDataException($"Texture type {description.Type} is invalid in this context.");
 
         var desc = new Texture3DDesc
@@ -210,7 +235,20 @@ public unsafe partial class Direct3D11GraphicsDevice(IWindow window) : IGraphics
         if (result < 0)
             throw new InvalidOperationException($"Failed to create D3D11 texture. HRESULT: 0x{result:X8}");
 
-        return new D3D11Texture((ID3D11Resource*)texture);
+        ID3D11ShaderResourceView* shaderResourceView = null;
+
+        if (description.Usage == TextureUsage.Sampled)
+        {
+            result = _device->CreateShaderResourceView((ID3D11Resource*)texture, null, &shaderResourceView);
+
+            if (result < 0)
+            {
+                texture->Release();
+                throw new InvalidOperationException($"Failed to create shader resource view. HRESULT: 0x{result:X8}");
+            }
+        }
+
+        return new D3D11Texture((ID3D11Resource*)texture, _context, shaderResourceView);
     }
 
     private ITexture CreateTextureCube(in TextureDescription description)
@@ -240,10 +278,22 @@ public unsafe partial class Direct3D11GraphicsDevice(IWindow window) : IGraphics
         var result = _device->CreateTexture2D(&desc, null, &texture);
 
         if (result < 0)
-            throw new InvalidOperationException(
-                $"Failed to create D3D11 cube texture. HRESULT: 0x{result:X8}");
+            throw new InvalidOperationException($"Failed to create D3D11 cube texture. HRESULT: 0x{result:X8}");
 
-        return new D3D11Texture((ID3D11Resource*)texture);
+        ID3D11ShaderResourceView* shaderResourceView = null;
+
+        if (description.Usage == TextureUsage.Sampled)
+        {
+            result = _device->CreateShaderResourceView((ID3D11Resource*)texture, null, &shaderResourceView);
+
+            if (result < 0)
+            {
+                texture->Release();
+                throw new InvalidOperationException($"Failed to create shader resource view. HRESULT: 0x{result:X8}");
+            }
+        }
+
+        return new D3D11Texture((ID3D11Resource*)texture, _context, shaderResourceView);
     }
     
     public ITexture CreateTexture(in TextureDescription description)
@@ -461,8 +511,7 @@ public unsafe partial class Direct3D11GraphicsDevice(IWindow window) : IGraphics
         {
             var element = elements[i];
 
-            semanticPointers[i] =
-                Marshal.StringToCoTaskMemUTF8(element.Semantic);
+            semanticPointers[i] = Marshal.StringToCoTaskMemUTF8(element.Semantic);
 
             nativeElements[i] = new InputElementDesc
             {
@@ -491,8 +540,7 @@ public unsafe partial class Direct3D11GraphicsDevice(IWindow window) : IGraphics
                     &layout);
 
                 if (result < 0)
-                    throw new InvalidOperationException(
-                        $"Failed to create D3D11 input layout. HRESULT: 0x{result:X8}");
+                    throw new InvalidOperationException($"Failed to create D3D11 input layout. HRESULT: 0x{result:X8}");
             }
 
             return new D3D11VertexLayout(layout);
@@ -716,11 +764,7 @@ public unsafe partial class Direct3D11GraphicsDevice(IWindow window) : IGraphics
     {
         ID3D11Fence* fence = null;
 
-        var result = _device5->CreateFence(
-            0,
-            0,
-            SilkMarshal.GuidPtrOf<ID3D11Fence>(),
-            (void**)&fence);
+        var result = _device5->CreateFence(0, 0, SilkMarshal.GuidPtrOf<ID3D11Fence>(), (void**)&fence);
 
         if (result < 0)
             throw new InvalidOperationException($"Failed to create D3D11 fence. HRESULT: 0x{result:X8}");

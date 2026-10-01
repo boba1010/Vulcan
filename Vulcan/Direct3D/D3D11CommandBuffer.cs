@@ -43,15 +43,11 @@ public unsafe sealed class D3D11CommandBuffer : ICommandBuffer
         d3dPipeline.Bind(Context);
     }
 
-    public void SetVertexBuffer(IBuffer buffer)
+    public void SetVertexBuffer(IBuffer buffer, uint stride)
     {
         var vertexBuffer = (D3D11Buffer)buffer;
-
         var handle = vertexBuffer.Handle;
-
-        uint stride = 12;
         uint offset = 0;
-
         Context->IASetVertexBuffers(0, 1, &handle, &stride, &offset);
     }
 
@@ -125,5 +121,22 @@ public unsafe sealed class D3D11CommandBuffer : ICommandBuffer
 
     public void Dispose()
     {
+    }
+
+    public void SetTexture(ITexture texture, uint slot = 0)
+    {
+        var d3dTexture = (D3D11Texture)texture;
+
+        var shaderResourceView = d3dTexture.ShaderResourceView;
+
+        Context->PSSetShaderResources(slot, 1, &shaderResourceView);
+    }
+
+    public void SetSampler(ISampler sampler, uint slot = 0)
+    {
+        var d3dSampler = (D3D11Sampler)sampler;
+        var handle = d3dSampler.Handle;
+
+        Context->PSSetSamplers(slot, 1, &handle);
     }
 }

@@ -7,9 +7,11 @@ public interface ICommandBuffer : IDisposable
 
     void SetPipeline(IPipeline pipeline);
 
-    void SetVertexBuffer(IBuffer buffer);
+    void SetVertexBuffer(IBuffer buffer, uint stride);
     void SetIndexBuffer(IBuffer buffer);
     void SetUniformBuffer(IBuffer buffer, uint slot = 0);
+    void SetTexture(ITexture texture, uint slot = 0);
+    void SetSampler(ISampler sampler, uint slot = 0);
 
     void SetViewport(in IViewport viewport);
     void SetScissor(in IScissorRect scissor);
