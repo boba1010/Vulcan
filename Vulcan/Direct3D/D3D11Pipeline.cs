@@ -34,18 +34,11 @@ public unsafe sealed class D3D11Pipeline : IPipeline
 
     internal void Bind(ID3D11DeviceContext* context)
     {
-        context->VSSetShader(
-            (ID3D11VertexShader*)VertexShader.Handle,
-            null,
-            0);
+        context->VSSetShader((ID3D11VertexShader*)VertexShader.Handle, null, 0);
 
-        context->PSSetShader(
-            (ID3D11PixelShader*)FragmentShader.Handle,
-            null,
-            0);
+        context->PSSetShader((ID3D11PixelShader*)FragmentShader.Handle, null, 0);
 
-        context->IASetInputLayout(
-            VertexLayout.Handle);
+        context->IASetInputLayout(VertexLayout.Handle);
 
         context->IASetPrimitiveTopology(
             PrimitiveTopology switch
@@ -68,17 +61,12 @@ public unsafe sealed class D3D11Pipeline : IPipeline
                 _ => throw new ArgumentOutOfRangeException()
             });
 
-        context->RSSetState(
-            Rasterizer.Handle);
+        context->RSSetState(Rasterizer.Handle);
 
-        context->OMSetDepthStencilState(
-            DepthStencil.Handle,
-            0);
+        if (DepthStencil is not null)
+            context->OMSetDepthStencilState(DepthStencil.Handle, 0);
 
-        context->OMSetBlendState(
-            Blend.Handle,
-            null,
-            uint.MaxValue);
+        context->OMSetBlendState(Blend.Handle, null, uint.MaxValue);
     }
 
     public void Dispose()
