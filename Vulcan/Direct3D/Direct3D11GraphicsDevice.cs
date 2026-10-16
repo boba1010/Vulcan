@@ -571,17 +571,15 @@ public unsafe partial class Direct3D11GraphicsDevice(IWindow window) : IGraphics
                 _ => throw new ArgumentOutOfRangeException()
             },
 
-            FrontCounterClockwise =
-                description.FrontFace == FrontFace.CounterClockwise,
+            FrontCounterClockwise = description.FrontFace == FrontFace.CounterClockwise,
 
-            DepthClipEnable = description.DepthClipEnable
+            DepthClipEnable = description.DepthClipEnable,
+            ScissorEnable = description.ScissorEnable
         };
 
         ID3D11RasterizerState* state = null;
 
-        var result = _device->CreateRasterizerState(
-            &desc,
-            &state);
+        var result = _device->CreateRasterizerState(&desc, &state);
 
         if (result < 0)
             throw new InvalidOperationException($"Failed to create D3D11 rasterizer state. HRESULT: 0x{result:X8}");
@@ -718,13 +716,10 @@ public unsafe partial class Direct3D11GraphicsDevice(IWindow window) : IGraphics
 
         ID3D11BlendState* state = null;
 
-        var result = _device->CreateBlendState(
-            &desc,
-            &state);
+        var result = _device->CreateBlendState(&desc, &state);
 
         if (result < 0)
-            throw new InvalidOperationException(
-                $"Failed to create D3D11 blend state. HRESULT: 0x{result:X8}");
+            throw new InvalidOperationException($"Failed to create D3D11 blend state. HRESULT: 0x{result:X8}");
 
         return new D3D11BlendState(state);
     }

@@ -6,4 +6,5 @@ public readonly struct RasterizerDescription
     public FrontFace FrontFace { get; init; }
     public FillMode FillMode { get; init; }
     public bool DepthClipEnable { get; init; }
+    public bool ScissorEnable { get; init; }
 }

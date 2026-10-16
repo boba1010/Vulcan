@@ -117,6 +117,7 @@ public unsafe sealed class D3D11CommandBuffer : ICommandBuffer
         var handle = uniformBuffer.Handle;
 
         Context->VSSetConstantBuffers(slot, 1, &handle);
+        Context->PSSetConstantBuffers(slot, 1, &handle);
     }
 
     public void Dispose()
