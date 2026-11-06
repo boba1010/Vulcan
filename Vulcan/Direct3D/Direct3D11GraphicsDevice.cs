@@ -21,12 +21,21 @@ public unsafe partial class Direct3D11GraphicsDevice(IWindow window) : IGraphics
     private ID3D11DeviceContext* _context;
     private ComPtr<IDXGIFactory2> _factory;
     private ID3D11Query* _waitIdleQuery;
-    private ID3D11DeviceContext4* _context4;
+    private readonly ID3D11DeviceContext4* _context4;
 
     public IBuffer CreateBuffer(in BufferDescription description)
     {
         if (description.Size > uint.MaxValue)
             throw new ArgumentOutOfRangeException(nameof(description), "D3D11 buffers cannot exceed 4 GB.");
+
+        if (description.Size == 0)
+            throw new ArgumentOutOfRangeException(nameof(description), "Buffer size must be greater than zero.");
+
+        if (description.MemoryUsage == MemoryUsage.Upload &&
+            description.Usage is not (BufferUsage.Vertex or BufferUsage.Index or BufferUsage.Uniform))
+        {
+            throw new NotSupportedException("This D3D11 upload path currently supports vertex, index, and uniform buffers.");
+        }
 
         var desc = new BufferDesc
         {
@@ -55,22 +64,17 @@ public unsafe partial class Direct3D11GraphicsDevice(IWindow window) : IGraphics
                 MemoryUsage.Readback => (uint)CpuAccessFlag.Read,
                 _ => 0
             },
-            MiscFlags = description.Usage == BufferUsage.Indirect
-            ? (uint)ResourceMiscFlag.DrawindirectArgs
-            : 0
+            MiscFlags = description.Usage == BufferUsage.Indirect ? (uint)ResourceMiscFlag.DrawindirectArgs : 0
         };
 
         ID3D11Buffer* buffer = null;
 
-        var result = _device->CreateBuffer(
-            &desc,
-            null,
-            &buffer);
+        var result = _device->CreateBuffer(&desc, null, &buffer);
 
         if (result < 0)
             throw new InvalidOperationException($"Failed to create D3D11 buffer. HRESULT: 0x{result:X8}");
 
-        return new D3D11Buffer(buffer, _context);
+        return new D3D11Buffer(buffer, _context, description.Size);
     }
 
     private Format GetFormat(TextureFormat format)

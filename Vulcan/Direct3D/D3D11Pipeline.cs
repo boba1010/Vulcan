@@ -61,12 +61,14 @@ public unsafe sealed class D3D11Pipeline : IPipeline
                 _ => throw new ArgumentOutOfRangeException()
             });
 
-        context->RSSetState(Rasterizer.Handle);
+        if (Rasterizer is not null)
+            context->RSSetState(Rasterizer.Handle);
 
         if (DepthStencil is not null)
             context->OMSetDepthStencilState(DepthStencil.Handle, 0);
 
-        context->OMSetBlendState(Blend.Handle, null, uint.MaxValue);
+        if (Blend is not null)
+            context->OMSetBlendState(Blend.Handle, null, uint.MaxValue);
     }
 
     public void Dispose()

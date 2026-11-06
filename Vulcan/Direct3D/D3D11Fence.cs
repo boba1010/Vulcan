@@ -30,4 +30,6 @@ public unsafe sealed class D3D11Fence : IFence
     {
         return ++_value;
     }
+
+    public bool IsCompleted => Handle->GetCompletedValue() >= _value;
 }
